@@ -1,69 +1,54 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { sql } from "@/lib/db";
+import { getUserId } from "@/lib/user";
 
-export default function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const q = ((await searchParams).q ?? "").trim().slice(0, 50);
+  const userId = await getUserId();
+  const like = "%" + q.replace(/[%_\\]/g, "\\$&") + "%";
+  const books = await sql<
+    { id: number; title: string; subject: string; publisher: string; year: number | null; status: string; sections: number }[]
+  >`
+    select b.id, b.title, b.subject, b.publisher, b.year, b.status,
+           (select count(*)::int from sections s where s.book_id = b.id) as sections
+    from books b
+    where (b.status = 'approved' or b.created_by = ${userId})
+      and (${q}::text = '' or b.title ilike ${like} or b.subject ilike ${like} or b.publisher ilike ${like})
+    order by b.status desc, b.title
+    limit 100`;
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <section className="hero">
+        <h1>한 번에 풀고, 한 번에 채점.</h1>
+        <p>답만 입력하면 틀린 번호만 알려줍니다. 정답은 다시 풀어본 뒤에 확인하세요.</p>
+        <form className="search" action="/">
+          <input name="q" defaultValue={q} placeholder="문제집 이름, 과목으로 검색" />
+          <button className="btn primary">검색</button>
+        </form>
+      </section>
+
+      {books.length === 0 ? (
+        <p className="empty">
+          {q ? `'${q}' 검색 결과가 없습니다. ` : "아직 등록된 문제집이 없습니다. "}
+          <Link href="/register">직접 등록하기 →</Link>
+        </p>
+      ) : (
+        <ul className="list">
+          {books.map((b) => (
+            <li key={b.id}>
+              <Link href={`/books/${b.id}`} className="card">
+                <span className="tag">{b.subject}</span>
+                <strong>{b.title}</strong>
+                <span className="muted">
+                  {[b.publisher, b.year, `${b.sections}개 단원`].filter(Boolean).join(" · ")}
+                  {b.status === "pending" && " · 검토 중 (나만 보임)"}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

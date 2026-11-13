@@ -1,36 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 빠른답지
 
-## Getting Started
+답만 입력하면 바로 채점해 주는 사이트. 정답은 숨기고 틀린 번호만 알려준다.
 
-First, run the development server:
+## 기능 (v0)
+- 문제집 검색 → 단원 선택 → 답 연속 입력 → 채점 (정답은 서버에만 있고 화면으로 보내지 않음)
+- 틀린 문제만 다시 풀기, 원할 때만 정답 보기, 문항별 정답률(3명 이상 풀었을 때)
+- 내 오답 목록 (다시 맞히면 사라짐)
+- 사용자 문제집 등록 → 관리자 승인 후 공개 (`/admin`)
+- 의견 보내기 (관리자 페이지에서 확인)
+- 회원가입 없음: 브라우저 쿠키로만 구분, 개인정보 미수집
 
+## 실행
 ```bash
+cp .env.example .env.local   # DATABASE_URL, ADMIN_PASSWORD 채우기
+npm install
+npm run db:setup             # 테이블 생성 (여러 번 실행해도 안전)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 구조
+- `db/schema.sql` — 테이블 정의
+- `app/actions.ts` — 채점·등록·피드백·관리자 서버 로직
+- `lib/normalize.ts` — 답 비교 규칙, 정답 입력 문자열 해석
+- `app/grade/[sectionId]/GradeForm.tsx` — 답 입력/결과 화면
