@@ -6,7 +6,7 @@ export default async function WrongPage() {
   const userId = await getUserId();
   const rows = userId
     ? await sql<{ book_id: number; title: string; section_id: number; name: string; labels: string[] }[]>`
-        select b.id as book_id, b.title, s.id as section_id, s.name,
+        select b.id as book_id, b.title, s.id as section_id, concat_ws(' · ', nullif(s.grp, ''), s.name) as name,
                array_agg(q.label order by q.ord) as labels
         from (
           select distinct on (i.question_id) i.question_id, i.is_correct
@@ -18,7 +18,7 @@ export default async function WrongPage() {
         join sections s on s.id = q.section_id
         join books b on b.id = s.book_id
         where not t.is_correct
-        group by b.id, b.title, s.id, s.name, s.ord
+        group by b.id, b.title, s.id, s.grp, s.name, s.ord
         order by b.title, s.ord`
     : [];
 

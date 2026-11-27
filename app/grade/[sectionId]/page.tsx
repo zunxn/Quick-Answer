@@ -22,7 +22,7 @@ export default async function GradePage({
   const userId = await getUserId();
 
   const [sec] = await sql`
-    select s.id, s.name, s.note, b.id as book_id, b.title, b.status, b.created_by
+    select s.id, s.grp, s.name, s.note, b.id as book_id, b.title, b.status, b.created_by
     from sections s join books b on b.id = s.book_id where s.id = ${sectionId}`;
   if (!sec || !(await canSeeBook(sec as never, userId, await isAdmin()))) notFound();
 
@@ -46,6 +46,7 @@ export default async function GradePage({
   return (
     <>
       <p className="crumb"><Link href={`/books/${sec.book_id}`}>← {sec.title}</Link></p>
+      {sec.grp && <p className="crumb">{sec.grp}</p>}
       <h1>{sec.name}{retry && " — 오답 다시 풀기"}</h1>
       {sec.note && <p className="muted">{sec.note}</p>}
       {!retry && nums.length > 0 && (

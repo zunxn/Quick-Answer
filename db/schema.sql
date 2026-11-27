@@ -68,3 +68,7 @@ alter table questions drop constraint if exists questions_kind_check;
 alter table questions add constraint questions_kind_check check (kind in ('choice','short','self'));
 alter table attempt_items alter column is_correct drop not null;
 alter table sections add column if not exists note text not null default '';
+
+-- v0.3: 단원 묶음(중단원 등), 문항별 해설 쪽수
+alter table sections add column if not exists grp text not null default '';
+alter table questions add column if not exists ref text not null default '';

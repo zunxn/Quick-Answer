@@ -12,9 +12,9 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   if (!book || !(await canSeeBook(book as never, userId, await isAdmin()))) notFound();
 
   const sections = await sql<
-    { id: number; name: string; note: string; total: number; last_correct: number | null; last_total: number | null; wrong: number }[]
+    { id: number; grp: string; name: string; note: string; total: number; last_correct: number | null; last_total: number | null; wrong: number }[]
   >`
-    select s.id, s.name, s.note,
+    select s.id, s.grp, s.name, s.note,
       (select count(*)::int from questions q where q.section_id = s.id) as total,
       la.correct as last_correct, la.total as last_total,
       coalesce((
@@ -33,6 +33,13 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
     where s.book_id = ${id}
     order by s.ord`;
 
+  const groups: [string, (typeof sections)[number][]][] = [];
+  for (const s of sections) {
+    const last = groups[groups.length - 1];
+    if (last && last[0] === s.grp) last[1].push(s);
+    else groups.push([s.grp, [s]]);
+  }
+
   return (
     <>
       <p className="crumb"><Link href="/">← 문제집 목록</Link></p>
@@ -41,8 +48,11 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
         {[book.subject, book.publisher, book.year].filter(Boolean).join(" · ")}
         {book.status === "pending" && " · 검토 중 — 승인 전까지 나에게만 보입니다"}
       </p>
-      <ul className="list">
-        {sections.map((s) => (
+      {groups.map(([grp, secs]) => (
+        <section key={grp || "_"}>
+          {grp && <h2>{grp}</h2>}
+          <ul className="list">
+        {secs.map((s) => (
           <li key={s.id} className="card sec">
             <div>
               <strong>{s.name}</strong>
@@ -61,7 +71,9 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
             </div>
           </li>
         ))}
-      </ul>
+          </ul>
+        </section>
+      ))}
     </>
   );
 }

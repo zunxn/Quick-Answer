@@ -143,6 +143,7 @@ export default function GradeForm({
                     <span className="muted small">내 답</span> {values[q.id] || "–"}
                     <br />
                     <span className="muted small">정답</span> <b>{it.answer}</b>
+                    {it.ref && <span className="muted small"> · {it.ref}</span>}
                   </span>
                   <span className="row">
                     <button className={`btn ${it.isCorrect === true ? "okb" : ""}`} disabled={pending} onClick={() => selfMark(q.id, true)}>○</button>
@@ -179,6 +180,7 @@ export default function GradeForm({
                 <span className="mark">{st === "ok" ? "○" : st === "ng" ? "✕" : "?"}</span>
                 <span className="mine">{values[q.id] || "–"}</span>
                 {answers && st === "ng" && q.kind !== "self" && <span className="ans">정답 {answers[q.id]}</span>}
+                {st === "ng" && it?.ref && <span className="ref">{it.ref}</span>}
                 {it && it.solvers >= 3 && it.rate !== null && (
                   <span className="rate">정답률 {Math.round(it.rate * 100)}%</span>
                 )}

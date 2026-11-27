@@ -21,8 +21,8 @@ await sql.begin(async (tx) => {
     values (${book.title}, ${book.subject}, ${book.publisher ?? ""}, ${book.year ?? null}, 'approved') returning id`;
   for (const [i, s] of book.sections.entries()) {
     const [sec] = await tx`
-      insert into sections (book_id, name, ord, note) values (${b.id}, ${s.name}, ${i}, ${s.note ?? ""}) returning id`;
-    await tx`insert into questions ${tx(s.questions.map((q, j) => ({ section_id: sec.id, label: q.label, ord: j, kind: q.kind, answer: q.answer })))}`;
+      insert into sections (book_id, grp, name, ord, note) values (${b.id}, ${s.grp ?? ""}, ${s.name}, ${i}, ${s.note ?? ""}) returning id`;
+    await tx`insert into questions ${tx(s.questions.map((q, j) => ({ section_id: sec.id, label: q.label, ord: j, kind: q.kind, answer: q.answer, ref: q.ref ?? "" })))}`;
   }
   console.log(`등록 완료: ${book.title} (id ${b.id}), ${book.sections.length}개 단원, ${book.sections.reduce((n, s) => n + s.questions.length, 0)}문항`);
 });

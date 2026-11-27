@@ -12,7 +12,7 @@ export type GradeResult = {
   total: number;
   correct: number;
   // isCorrect=null: 자가채점 문항 (answer가 함께 온다)
-  items: { questionId: number; isCorrect: boolean | null; answer?: string; rate: number | null; solvers: number }[];
+  items: { questionId: number; isCorrect: boolean | null; answer?: string; ref: string; rate: number | null; solvers: number }[];
 };
 
 // 채점: 맞음/틀림만 돌려주고 정답은 돌려주지 않는다.
@@ -25,8 +25,8 @@ export async function gradeAction(
   if (!Number.isInteger(sectionId) || !Array.isArray(responses) || responses.length === 0 || responses.length > 500)
     throw new Error("잘못된 요청입니다.");
   const userId = await ensureUserId();
-  const questions = await sql<{ id: number; answer: string; kind: string }[]>`
-    select id, answer, kind from questions where section_id = ${sectionId}`;
+  const questions = await sql<{ id: number; answer: string; kind: string; ref: string }[]>`
+    select id, answer, kind, ref from questions where section_id = ${sectionId}`;
   const qOf = new Map(questions.map((q) => [q.id, q]));
 
   const seen = new Set<number>();
@@ -78,6 +78,7 @@ export async function gradeAction(
         questionId: g.question_id,
         isCorrect: g.is_correct,
         ...(self ? { answer: displayAnswer(qOf.get(g.question_id)!.answer) } : {}),
+        ref: qOf.get(g.question_id)!.ref,
         rate: s?.rate ?? null,
         solvers: s?.solvers ?? 0,
       };
