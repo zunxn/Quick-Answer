@@ -62,3 +62,9 @@ create table if not exists feedback (
   page text not null default '',
   created_at timestamptz not null default now()
 );
+
+-- v0.2: 자가채점 문항, 단원 메모, 미확인 채점
+alter table questions drop constraint if exists questions_kind_check;
+alter table questions add constraint questions_kind_check check (kind in ('choice','short','self'));
+alter table attempt_items alter column is_correct drop not null;
+alter table sections add column if not exists note text not null default '';

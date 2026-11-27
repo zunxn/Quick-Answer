@@ -4,14 +4,15 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
-import { normalize, parseAnswers, type ParsedQ } from "@/lib/normalize";
+import { displayAnswer, isCorrect, parseAnswers, type ParsedQ } from "@/lib/normalize";
 import { adminToken, ensureUserId, getUserId, isAdmin } from "@/lib/user";
 
 export type GradeResult = {
   attemptId: number;
   total: number;
   correct: number;
-  items: { questionId: number; isCorrect: boolean; rate: number | null; solvers: number }[];
+  // isCorrect=null: 자가채점 문항 (answer가 함께 온다)
+  items: { questionId: number; isCorrect: boolean | null; answer?: string; rate: number | null; solvers: number }[];
 };
 
 // 채점: 맞음/틀림만 돌려주고 정답은 돌려주지 않는다.
@@ -24,25 +25,25 @@ export async function gradeAction(
   if (!Number.isInteger(sectionId) || !Array.isArray(responses) || responses.length === 0 || responses.length > 500)
     throw new Error("잘못된 요청입니다.");
   const userId = await ensureUserId();
-  const questions = await sql<{ id: number; answer: string }[]>`
-    select id, answer from questions where section_id = ${sectionId}`;
-  const answerOf = new Map(questions.map((q) => [q.id, q.answer]));
+  const questions = await sql<{ id: number; answer: string; kind: string }[]>`
+    select id, answer, kind from questions where section_id = ${sectionId}`;
+  const qOf = new Map(questions.map((q) => [q.id, q]));
 
   const seen = new Set<number>();
-  const graded: { question_id: number; response: string; is_correct: boolean }[] = [];
+  const graded: { question_id: number; response: string; is_correct: boolean | null }[] = [];
   for (const r of responses) {
-    const ans = answerOf.get(r.questionId);
-    if (ans === undefined || seen.has(r.questionId)) continue;
+    const q = qOf.get(r.questionId);
+    if (!q || seen.has(r.questionId)) continue;
     seen.add(r.questionId);
     const response = String(r.response ?? "").slice(0, 50);
     graded.push({
       question_id: r.questionId,
       response,
-      is_correct: response.trim() !== "" && normalize(response) === normalize(ans),
+      is_correct: q.kind === "self" ? null : isCorrect(response, q.answer),
     });
   }
   if (graded.length === 0) throw new Error("채점할 문항이 없습니다.");
-  const correct = graded.filter((g) => g.is_correct).length;
+  const correct = graded.filter((g) => g.is_correct === true).length;
   const secs = Math.max(0, Math.min(86400, Math.round(Number(seconds) || 0)));
 
   const attemptId = await sql.begin(async (tx) => {
@@ -60,7 +61,7 @@ export async function gradeAction(
     from (
       select distinct on (a.user_id, i.question_id) i.question_id, i.is_correct
       from attempt_items i join attempts a on a.id = i.attempt_id
-      where a.section_id = ${sectionId}
+      where a.section_id = ${sectionId} and i.is_correct is not null
       order by a.user_id, i.question_id, a.id
     ) t group by question_id`;
   const statOf = new Map(stats.map((s) => [s.question_id, s]));
@@ -72,7 +73,14 @@ export async function gradeAction(
     correct,
     items: graded.map((g) => {
       const s = statOf.get(g.question_id);
-      return { questionId: g.question_id, isCorrect: g.is_correct, rate: s?.rate ?? null, solvers: s?.solvers ?? 0 };
+      const self = g.is_correct === null;
+      return {
+        questionId: g.question_id,
+        isCorrect: g.is_correct,
+        ...(self ? { answer: displayAnswer(qOf.get(g.question_id)!.answer) } : {}),
+        rate: s?.rate ?? null,
+        solvers: s?.solvers ?? 0,
+      };
     }),
   };
 }
@@ -86,7 +94,31 @@ export async function revealAction(attemptId: number): Promise<{ questionId: num
     from attempt_items i
     join attempts a on a.id = i.attempt_id
     join questions q on q.id = i.question_id
-    where a.id = ${attemptId} and a.user_id = ${userId} and not i.is_correct`;
+    where a.id = ${attemptId} and a.user_id = ${userId} and i.is_correct is not true`
+    .then((rows) => rows.map((r) => ({ ...r, answer: displayAnswer(r.answer) })));
+}
+
+// 자가채점: 정답을 보고 본인이 맞음/틀림을 표시
+export async function selfMarkAction(attemptId: number, questionId: number, correct: boolean): Promise<{ ok: boolean }> {
+  const userId = await getUserId();
+  if (!userId || !Number.isInteger(attemptId) || !Number.isInteger(questionId)) return { ok: false };
+  const ok = await sql.begin(async (tx) => {
+    const [row] = await tx`
+      select i.is_correct from attempt_items i
+      join attempts a on a.id = i.attempt_id
+      join questions q on q.id = i.question_id
+      where i.attempt_id = ${attemptId} and i.question_id = ${questionId}
+        and a.user_id = ${userId} and q.kind = 'self'
+      for update of i`;
+    if (!row) return false;
+    const delta = (correct ? 1 : 0) - (row.is_correct ? 1 : 0);
+    await tx`update attempt_items set is_correct = ${!!correct}
+             where attempt_id = ${attemptId} and question_id = ${questionId}`;
+    if (delta) await tx`update attempts set correct = correct + ${delta} where id = ${attemptId}`;
+    return true;
+  });
+  if (ok) revalidatePath("/", "layout");
+  return { ok };
 }
 
 export type SectionInput = { name: string; start: number; compact: boolean; answers: string };

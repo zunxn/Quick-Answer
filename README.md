@@ -8,13 +8,16 @@
 - 내 오답 목록 (다시 맞히면 사라짐)
 - 사용자 문제집 등록 → 관리자 승인 후 공개 (`/admin`)
 - 의견 보내기 (관리자 페이지에서 확인)
+- 문항 종류: 객관식 / 단답형(자동 채점, 0.5=1/2, 루트2=√2, x²=x^2, y= 생략 허용) / 직접 확인(여러 값·구간 → 채점 후 정답 보고 본인이 ○✕)
+- 번호 범위 지정 채점 (예: 041~060번만)
 - 회원가입 없음: 브라우저 쿠키로만 구분, 개인정보 미수집
 
 ## 실행
 ```bash
 cp .env.example .env.local   # DATABASE_URL, ADMIN_PASSWORD 채우기
 npm install
-npm run db:setup             # 테이블 생성 (여러 번 실행해도 안전)
+npm run db:setup             # 테이블 생성·업데이트 (여러 번 실행해도 안전)
+npm run db:seed data/파일.json  # 운영자 문제집 데이터 넣기 (data/ 는 git에 올리지 않음)
 npm run dev
 ```
 

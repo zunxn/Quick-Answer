@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { gradeAction, revealAction, type GradeResult } from "../../actions";
+import { gradeAction, revealAction, selfMarkAction, type GradeResult } from "../../actions";
 
-type Q = { id: number; label: string; kind: "choice" | "short" };
+type Q = { id: number; label: string; kind: "choice" | "short" | "self" };
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
@@ -64,7 +64,7 @@ export default function GradeForm({
   };
 
   const submit = () => {
-    const blank = active.filter((q) => !(values[q.id] ?? "").trim()).length;
+    const blank = active.filter((q) => q.kind !== "self" && !(values[q.id] ?? "").trim()).length;
     if (blank > 0 && !confirm(`입력하지 않은 문항이 ${blank}개 있습니다. 틀린 것으로 채점할까요?`)) return;
     setError("");
     start(async () => {
@@ -85,7 +85,7 @@ export default function GradeForm({
 
   const retryWrong = () => {
     if (!result) return;
-    const wrong = new Set(result.items.filter((i) => !i.isCorrect).map((i) => i.questionId));
+    const wrong = new Set(result.items.filter((i) => i.isCorrect === false).map((i) => i.questionId));
     setActive(active.filter((q) => wrong.has(q.id)));
     setIsRetry(true);
     setValues({});
@@ -103,9 +103,24 @@ export default function GradeForm({
     });
   };
 
+  const selfMark = (questionId: number, ok: boolean) => {
+    if (!result) return;
+    start(async () => {
+      const r = await selfMarkAction(result.attemptId, questionId, ok);
+      if (!r.ok) return;
+      setResult((prev) => {
+        if (!prev) return prev;
+        const items = prev.items.map((it) => (it.questionId === questionId ? { ...it, isCorrect: ok } : it));
+        return { ...prev, items, correct: items.filter((it) => it.isCorrect === true).length };
+      });
+    });
+  };
+
   if (result) {
     const itemOf = new Map(result.items.map((i) => [i.questionId, i]));
-    const wrong = active.filter((q) => !itemOf.get(q.id)?.isCorrect);
+    const selfQs = active.filter((q) => q.kind === "self");
+    const pendingSelf = selfQs.filter((q) => itemOf.get(q.id)?.isCorrect === null).length;
+    const wrong = active.filter((q) => itemOf.get(q.id)?.isCorrect === false);
     return (
       <div>
         <div className="score">
@@ -114,8 +129,33 @@ export default function GradeForm({
           </div>
           <span className="muted">풀이 시간 {fmt(seconds)}</span>
         </div>
+
+        {selfQs.length > 0 && (
+          <div className="selfbox">
+            <strong>직접 확인할 문항 {pendingSelf > 0 && `(${pendingSelf}개 남음)`}</strong>
+            <p className="muted small">답이 여러 값·구간이라 자동 채점이 어려운 문항입니다. 정답과 비교해 직접 표시해 주세요.</p>
+            {selfQs.map((q) => {
+              const it = itemOf.get(q.id)!;
+              return (
+                <div key={q.id} className="selfrow">
+                  <span className="num">{q.label}</span>
+                  <span className="selfans">
+                    <span className="muted small">내 답</span> {values[q.id] || "–"}
+                    <br />
+                    <span className="muted small">정답</span> <b>{it.answer}</b>
+                  </span>
+                  <span className="row">
+                    <button className={`btn ${it.isCorrect === true ? "okb" : ""}`} disabled={pending} onClick={() => selfMark(q.id, true)}>○</button>
+                    <button className={`btn ${it.isCorrect === false ? "ngb" : ""}`} disabled={pending} onClick={() => selfMark(q.id, false)}>✕</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {wrong.length === 0 ? (
-          <p className="empty">전부 맞혔습니다. 🎉</p>
+          pendingSelf === 0 && <p className="empty">전부 맞혔습니다. 🎉</p>
         ) : (
           <>
             <p>
@@ -132,12 +172,13 @@ export default function GradeForm({
         <div className="grid result">
           {active.map((q) => {
             const it = itemOf.get(q.id);
+            const st = it?.isCorrect === true ? "ok" : it?.isCorrect === false ? "ng" : "pend";
             return (
-              <div key={q.id} className={`cell ${it?.isCorrect ? "ok" : "ng"}`}>
+              <div key={q.id} className={`cell ${st} ${q.kind}`}>
                 <span className="num">{q.label}</span>
-                <span className="mark">{it?.isCorrect ? "○" : "✕"}</span>
+                <span className="mark">{st === "ok" ? "○" : st === "ng" ? "✕" : "?"}</span>
                 <span className="mine">{values[q.id] || "–"}</span>
-                {answers && !it?.isCorrect && <span className="ans">정답 {answers[q.id]}</span>}
+                {answers && st === "ng" && q.kind !== "self" && <span className="ans">정답 {answers[q.id]}</span>}
                 {it && it.solvers >= 3 && it.rate !== null && (
                   <span className="rate">정답률 {Math.round(it.rate * 100)}%</span>
                 )}
@@ -149,20 +190,21 @@ export default function GradeForm({
     );
   }
 
-  const filled = active.filter((q) => (values[q.id] ?? "").trim()).length;
+  const gradable = active.filter((q) => q.kind !== "self");
+  const filled = gradable.filter((q) => (values[q.id] ?? "").trim()).length;
   return (
     <div>
       <div className="bar">
-        <span>{filled} / {active.length} 입력</span>
+        <span>{filled} / {gradable.length} 입력</span>
         <span className="timer">{fmt(seconds)}</span>
       </div>
       <p className="muted hint">
-        객관식은 숫자만 누르면 다음 칸으로 넘어갑니다. 단답형은 입력 후 Enter. 분수는 3/4, 루트는 √2 또는 루트2.
+        객관식은 숫자만 누르면 다음 칸으로 넘어갑니다. 단답형은 입력 후 Enter. 분수는 3/4, 루트는 √2 또는 루트2, 제곱은 x^2, 이하는 &lt;=.
       </p>
       <div className="grid">
         {active.map((q, i) => (
           <label key={q.id} className={`cell ${q.kind}`}>
-            <span className="num">{q.label}</span>
+            <span className="num">{q.label}{q.kind === "self" && <em> 직접 확인</em>}</span>
             <input
               ref={(el) => { inputs.current[i] = el; }}
               value={values[q.id] ?? ""}
@@ -171,8 +213,8 @@ export default function GradeForm({
               onFocus={(e) => e.target.select()}
               inputMode={q.kind === "choice" ? "numeric" : "text"}
               autoComplete="off"
-              maxLength={q.kind === "choice" ? 2 : 30}
-              placeholder={q.kind === "choice" ? "" : "단답"}
+              maxLength={q.kind === "choice" ? 2 : 50}
+              placeholder={q.kind === "choice" ? "" : q.kind === "self" ? "메모(선택)" : "단답"}
               aria-label={`${q.label}번`}
             />
           </label>

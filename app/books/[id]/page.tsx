@@ -12,9 +12,9 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   if (!book || !(await canSeeBook(book as never, userId, await isAdmin()))) notFound();
 
   const sections = await sql<
-    { id: number; name: string; total: number; last_correct: number | null; last_total: number | null; wrong: number }[]
+    { id: number; name: string; note: string; total: number; last_correct: number | null; last_total: number | null; wrong: number }[]
   >`
-    select s.id, s.name,
+    select s.id, s.name, s.note,
       (select count(*)::int from questions q where q.section_id = s.id) as total,
       la.correct as last_correct, la.total as last_total,
       coalesce((
@@ -51,6 +51,7 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
                 {s.last_total !== null && ` · 최근 ${s.last_correct}/${s.last_total}`}
                 {s.wrong > 0 && ` · 남은 오답 ${s.wrong}개`}
               </span>
+              {s.note && <span className="muted small">{s.note}</span>}
             </div>
             <div className="row">
               {s.wrong > 0 && (

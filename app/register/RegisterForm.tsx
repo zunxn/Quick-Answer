@@ -47,6 +47,8 @@ export default function RegisterForm() {
           <li>1~5 한 글자는 객관식, 그 외는 단답형으로 인식합니다.</li>
           <li>단답형인데 정답이 1~5이면 앞에 <code>=</code>를 붙입니다. 예: <code>=3</code></li>
           <li>복수 정답은 작은 번호부터 붙여 씁니다. 예: ②,④ → <code>24</code></li>
+          <li>여러 값·구간처럼 자동 채점이 어려운 답은 앞에 <code>?</code>를 붙이면 채점 후 본인이 직접 확인합니다. 예: <code>?a=1,b=2</code> (띄어쓰기 없이)</li>
+          <li>&lsquo;풀이 참조&rsquo; 서술형 문항은 넣지 말고 시작 번호를 나눠 단원을 따로 만드세요.</li>
           <li>전부 객관식이면 &lsquo;객관식만&rsquo;을 켜고 <code>31425 23415</code>처럼 붙여 써도 됩니다.</li>
         </ul>
       </details>
@@ -71,7 +73,7 @@ export default function RegisterForm() {
             <div className="row between">
               <span className="muted">
                 {qs.length > 0
-                  ? `${qs[0].label}~${qs[qs.length - 1].label}번 · ${qs.length}문항 (객관식 ${qs.filter((q) => q.kind === "choice").length}, 단답형 ${qs.filter((q) => q.kind === "short").length})`
+                  ? `${qs[0].label}~${qs[qs.length - 1].label}번 · ${qs.length}문항 (객관식 ${qs.filter((q) => q.kind === "choice").length}, 단답형 ${qs.filter((q) => q.kind === "short").length}${qs.some((q) => q.kind === "self") ? `, 직접 확인 ${qs.filter((q) => q.kind === "self").length}` : ""})`
                   : "정답을 입력하면 문항 수가 표시됩니다"}
               </span>
               {sections.length > 1 && (

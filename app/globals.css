@@ -121,3 +121,19 @@ code { background: var(--bg); border-radius: 4px; padding: 1px 5px; }
   display: grid; gap: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.18);
 }
 .fb-panel .row { justify-content: flex-end; }
+
+/* v0.2 */
+.small { font-size: .8rem; }
+.cell.self { grid-column: span 2; }
+.cell .num em { font-style: normal; font-weight: 600; color: var(--brand); margin-left: 4px; }
+.cell.pend { background: var(--card); border-style: dashed; }
+.cell.pend .mark { color: var(--muted); }
+.range { display: flex; align-items: center; gap: 6px; margin: 8px 0; font-size: .9rem; font-weight: 600; }
+.range input { width: 76px; padding: 7px 8px; text-align: center; }
+.selfbox { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 12px 0; display: grid; gap: 8px; }
+.selfbox p { margin: 0; }
+.selfrow { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; }
+.selfrow .num { font-weight: 700; font-size: .85rem; color: var(--muted); }
+.selfans { overflow-wrap: anywhere; font-size: .95rem; }
+.btn.okb { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+.btn.ngb { background: var(--ng-bg); color: var(--ng); border-color: var(--ng); }
